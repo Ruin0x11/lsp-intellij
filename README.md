@@ -1,7 +1,7 @@
 # lsp-intellij [![MELPA](https://melpa.org/packages/lsp-rust-badge.svg)](https://melpa.org/#/lsp-intellij)
 Emacs client for [lsp-intellij-server](https://github.com/Ruin0x11/intellij-lsp-server).
 
-# Setup
+## Setup
 Install the package from MELPA. Then load `lsp-mode` in your config and put the following hook afterward:
 ```emacs-lisp
 (with-eval-after-load 'lsp-mode
