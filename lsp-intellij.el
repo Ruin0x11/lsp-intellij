@@ -4,8 +4,8 @@
 
 ;; Author:  Ian Pickering <ipickering2@gmail.com>
 ;; Version: 0.1
-;; Keywords: java
 ;; Package-Requires: ((emacs "25.1") (lsp-mode "3.0"))
+;; Keywords: java
 ;; URL: https://github.com/emacs-lsp/lsp-rust
 
 ;; This program is free software; you can redistribute it and/or modify
