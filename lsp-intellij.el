@@ -111,7 +111,7 @@
    t))
 
 (defun lsp-intellij-toggle-frame-visibility ()
-  "Toggles visibility of the current project's frame."
+  "Toggle visibility of the current project's frame."
   (interactive)
   (lsp--cur-workspace-check)
   (lsp--send-request
