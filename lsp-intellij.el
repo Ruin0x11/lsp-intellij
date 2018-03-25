@@ -1,4 +1,4 @@
-;;; lsp-intellij.el --- Emacs client for lsp-intellij-server                   -*- lexical-binding: t; -*-
+;;; lsp-intellij.el --- Client for lsp-intellij-server                   -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2018
 
@@ -37,14 +37,14 @@
 ;;; Code:
 
 (require 'lsp-mode)
-(require 'cl)
+(require 'cl-lib)
 
 (defun lsp-intellij--get-root ()
   (let ((file (locate-dominating-file (buffer-file-name)
                                       (lambda (parent)
                                         (when (directory-name-p parent)
                                           (directory-files parent nil ".*.iml"))))))
-    (when (not file)
+    (unless file
       (error "No root found."))
     (file-name-directory file)))
 
