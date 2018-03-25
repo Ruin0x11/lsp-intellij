@@ -3,8 +3,8 @@
 ;; Copyright (C) 2018
 
 ;; Author:  Ian Pickering <ipickering2@gmail.com>
+;; Version: 1.0
 ;; Keywords: java
-;; Version: 0.1
 ;; Package-Requires: ((emacs "25.1") (lsp-mode "3.0"))
 ;; URL: https://github.com/emacs-lsp/lsp-rust
 
