@@ -97,11 +97,16 @@ of matched directories.  Nil otherwise."
                      file)))
         (file-name-directory root)))))
 
+(defun lsp-intellij--jar-root-dir (jar-path)
+  (let* ((jar-file-name (file-name-base jar-path))
+         (root-dir (concat temporary-file-directory "lsp-intellij/" jar-file-name)))
+    root-dir))
+
 (defun lsp-intellij--make-jar-temp-path (jar-path internal-path)
   "Return a temporary path for the file in the jar at JAR-PATH, INTERNAL-PATH, to be extracted to."
-  (let* ((jar-file-name (file-name-base jar-path))
+  (let* ((root-dir (lsp-intellij--jar-root-dir jar-path))
          (internal-dir (file-name-directory internal-path))
-         (temp-path (concat temporary-file-directory "lsp-intellij/" jar-file-name internal-dir)))
+         (temp-path (concat root-dir internal-dir)))
     temp-path))
 
 (defun lsp-intellij--write-jar-metadata (archive-path dest)
@@ -117,7 +122,8 @@ Used for allowing IntelliJ to find the actual jar an extracted jar file is conta
   (let* ((internal-dir (substring (file-name-directory internal-path) 1))
          (internal-file (file-name-nondirectory internal-path))
          (internal-name (file-name-sans-extension internal-file))
-         (search-string (concat internal-dir internal-name)))
+         (search-string (concat internal-dir internal-name))
+         (jarpath-dest (lsp-intellij--jar-root-dir source-archive)))
     (save-window-excursion
       (find-file source-archive)
       (let ((archive-buffer (current-buffer)))
@@ -127,7 +133,7 @@ Used for allowing IntelliJ to find the actual jar an extracted jar file is conta
         (let ((extract-buffer (current-buffer))
               (outpath (concat dest (file-name-nondirectory (buffer-file-name)))))
           (mkdir (file-name-directory outpath) t)
-          (lsp-intellij--write-jar-metadata source-archive dest)
+          (lsp-intellij--write-jar-metadata source-archive jarpath-dest)
           (write-file outpath nil)
           (kill-buffer archive-buffer)
           (kill-buffer extract-buffer)
@@ -157,11 +163,15 @@ Return the file path if found, nil otherwise."
          (paths (split-string raw "!"))
          (jar-path (concat drive-letter ":" (car paths)))
          (internal-path (cadr paths))
-         (temp-path (lsp-intellij--make-jar-temp-path jar-path internal-path)))
+         (temp-path (lsp-intellij--make-jar-temp-path jar-path internal-path))
+         (is-source-file (string-match-p lsp-intellij--file-extracted-from-jar-regex internal-path))
+         ;; For now, ask the user if we should still visit if no sources are found.
+         ;; In the future we could request IntelliJ to give us the decompiled .class file source.
+         (should-visit (or is-source-file
+                           (yes-or-no-p (format "%s seems to be a compiled class file. Visit anyway?"
+                                                internal-path)))))
 
-    ;; For now, just error if no sources are found.
-    ;; In the future we could request IntelliJ to give us the decompiled .class file source.
-    (if (file-exists-p jar-path)
+    (if (and should-visit (file-exists-p jar-path))
         (if-let ((existing-file
                   (lsp-intellij--extracted-file-exists (file-name-base internal-path) temp-path)))
             existing-file
