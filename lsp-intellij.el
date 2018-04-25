@@ -1,10 +1,12 @@
 ;;; lsp-intellij.el --- intellij lsp client                   -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2018
+;; Copyright (C) 2018 Ian Pickering
 
-;; Author:  Ruin0x11
-;; Keywords: java
+;; Author: Ruin0x11 <ipickering2@gmail.com>
+;; Keywords: java kotlin
 ;; Package-Requires: ((emacs "25.1") (lsp-mode "4.1"))
+;; Version: 0.1
+;; URL: https://github.com/Ruin0x11/lsp-intellij
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
