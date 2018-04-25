@@ -84,12 +84,48 @@ Advances point just past the message."
      ("testFinished"      nil)
      ("testIgnored"       nil)))
 
+(defun lsp-intellij-tests--on-suite-tree-started (attrs data)
+  (let ((tree (lsp-intellij--teamcity-data-suite-tree data))
+        (elts (lsp-intellij--teamcity-data-current-elements data))
+        (name (alist-get 'name attrs)))
+    (push elts (lsp-intellij--teamcity-data-element-stack data))
+    (push name (lsp-intellij--teamcity-data-name-stack data))
+    (setf (lsp-intellij--teamcity-data-current-elements data) '())))
+(defun lsp-intellij-tests--on-suite-tree-node (attrs data)
+  (let ((new-elt (alist-get 'name attrs)))
+    (push new-elt (lsp-intellij--teamcity-data-current-elements data))))
+(defun lsp-intellij-tests--on-suite-tree-ended (attrs data)
+  (let ((elts (lsp-intellij--teamcity-data-current-elements data)))
+    (setq next (pop (lsp-intellij--teamcity-data-element-stack data)))
+    (setq root (pop (lsp-intellij--teamcity-data-name-stack data)))
+    (push (cons root elts) next)
+    (setf (lsp-intellij--teamcity-data-current-elements data) next)))
+(defun lsp-intellij-tests--on-tree-ended (attrs data)
+  (let ((elts (lsp-intellij--teamcity-data-current-elements data)))
+    (setf (lsp-intellij--teamcity-data-suite-tree data) (cons 'root elts))))
+
+(comment
+ (let ((data (make-lsp-intellij--teamcity-data)))
+   (lsp-intellij-tests--on-suite-tree-started '((name . "doods")) data)
+   (lsp-intellij-tests--on-suite-tree-node '((name . "a")) data)
+   (lsp-intellij-tests--on-suite-tree-node '((name . "b")) data)
+   (lsp-intellij-tests--on-suite-tree-started '((name . "asdf")) data)
+   (lsp-intellij-tests--on-suite-tree-node '((name . "c")) data)
+   (lsp-intellij-tests--on-suite-tree-ended '() data)
+   (lsp-intellij-tests--on-suite-tree-node '((name . "d")) data)
+   (lsp-intellij-tests--on-suite-tree-ended '() data)
+   (lsp-intellij-tests--on-tree-ended '() data)
+   (lsp-intellij--teamcity-data-suite-tree data))
+ )
+
 (cl-defstruct lsp-intellij--teamcity-data
-  (suiteTree nil) ;; list representation of the test suite tree. car is root, cdr is children.
+  (suite-tree nil) ;; list representation of the test suite tree. car is root, cdr is children.
   ;; a subelement like (2 4 5 6) represents a tree with root 2 and children (4 5 6).
   ;; during list building there is no root (it is nil), but it is added on the rootName method.
-  (elementStack '()) ;; stack of parent elements for the current test suite node.
+  (element-stack (list)) ;; stack of parent elements for the current test suite node.
   ;; pushed to on suiteTreeStarted, popped on suiteTreeEnded.
+  (name-stack (list))
+  (current-elements (list))
 
   )
 
