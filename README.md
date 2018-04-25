@@ -1,8 +1,6 @@
 # lsp-intellij [![MELPA](https://melpa.org/packages/lsp-rust-badge.svg)](https://melpa.org/#/lsp-intellij)
 Emacs client for [lsp-intellij-server](https://github.com/Ruin0x11/intellij-lsp-server).
 
-**NOTE**: Not up to date, the current version lives in the `lsp-intellij-server` repository. It will be moved here once the MELPA package proposal is approved.
-
 ## Setup
 Install the package from MELPA. Then load `lsp-mode` in your config and put the following hook afterward:
 ```emacs-lisp
@@ -23,3 +21,6 @@ For features like diagnostics and snippet completion, `lsp-ui` and `company-lsp`
 (push 'company-lsp company-backends)
 (push 'java-mode company-global-modes)
 ```
+
+### Spacemacs layer
+See [here](https://github.com/Ruin0x11/lsp-intellij-spacemacs).
