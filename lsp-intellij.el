@@ -403,7 +403,8 @@ This will run all tests if the class is a test class."
       (progn
         (message "Build failed with %s errors and %s warnings." errors warnings)
         (pop-to-buffer (get-buffer-create "*lsp-intellij-build-output*") 'other-window)
-        (goto-char (point-min))))
+        (goto-char (point-min))
+        (next-error)))
 
      (is-aborted (message "Build was aborted."))
 

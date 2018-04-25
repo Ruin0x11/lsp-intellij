@@ -98,36 +98,72 @@ Advances point just past the message."
   (let ((elts (lsp-intellij--teamcity-data-current-elements data)))
     (setq next (pop (lsp-intellij--teamcity-data-element-stack data)))
     (setq root (pop (lsp-intellij--teamcity-data-name-stack data)))
-    (push (cons root elts) next)
+    (push (cons root (reverse elts)) next)
     (setf (lsp-intellij--teamcity-data-current-elements data) next)))
 (defun lsp-intellij-tests--on-tree-ended (attrs data)
-  (let ((elts (lsp-intellij--teamcity-data-current-elements data)))
-    (setf (lsp-intellij--teamcity-data-suite-tree data) (cons 'root elts))))
+  ;; render tree?
+  )
+
+(defun lsp-intellij-tests--on-root-name (attrs data)
+  (let ((elts (lsp-intellij--teamcity-data-current-elements data))
+        (name (alist-get 'name attrs)))
+    ;; surround existing log drawer under root
+    ;; render other nodes after
+    (setf (lsp-intellij--teamcity-data-suite-tree data) (cons name (reverse elts)))))
+
+(defun lsp-intellij-tests--go ()
+  (interactive)
+  (let ((data (make-lsp-intellij--teamcity-data)))
+    (lsp-intellij-tests--on-suite-tree-started '((name . "doods")) data)
+    (lsp-intellij-tests--on-suite-tree-node '((name . "a")) data)
+    (lsp-intellij-tests--on-suite-tree-node '((name . "b")) data)
+    (lsp-intellij-tests--on-suite-tree-started '((name . "asdf")) data)
+    (lsp-intellij-tests--on-suite-tree-node '((name . "c")) data)
+    (lsp-intellij-tests--on-suite-tree-ended '() data)
+    (lsp-intellij-tests--on-suite-tree-node '((name . "d")) data)
+    (lsp-intellij-tests--on-suite-tree-ended '() data)
+    (lsp-intellij-tests--on-tree-ended '() data)
+    (lsp-intellij-tests--on-root-name '((name . "theRoot")) data)
+    (with-current-buffer (get-buffer-create "*dood*")
+      (erase-buffer)
+      (toggle-truncate-lines t)
+      (preorder (lambda (node level) (print-node node level))
+                (lsp-intellij--teamcity-data-suite-tree data)
+                0))))
+
+(defun print-node (node level)
+  (insert (make-string (* 2 level) ? ))
+  (insert "[?] ")
+  (insert node)
+  (insert (make-string (- 40 (* 2 level) (length node)) ?-))
+  (insert "123 ms")
+  (insert "\n"))
 
 (comment
  (let ((data (make-lsp-intellij--teamcity-data)))
-   (lsp-intellij-tests--on-suite-tree-started '((name . "doods")) data)
    (lsp-intellij-tests--on-suite-tree-node '((name . "a")) data)
    (lsp-intellij-tests--on-suite-tree-node '((name . "b")) data)
-   (lsp-intellij-tests--on-suite-tree-started '((name . "asdf")) data)
    (lsp-intellij-tests--on-suite-tree-node '((name . "c")) data)
-   (lsp-intellij-tests--on-suite-tree-ended '() data)
    (lsp-intellij-tests--on-suite-tree-node '((name . "d")) data)
-   (lsp-intellij-tests--on-suite-tree-ended '() data)
    (lsp-intellij-tests--on-tree-ended '() data)
+   (lsp-intellij-tests--on-root-name '((name . "theRoot")) data)
    (lsp-intellij--teamcity-data-suite-tree data))
  )
+
+(defun preorder (f node level)
+  (if (listp node)
+      (progn
+        (funcall f (car node) level)
+        (mapc (lambda (n) (preorder f n (+ level 1))) (cdr node)))
+    (funcall f node level)))
 
 (cl-defstruct lsp-intellij--teamcity-data
   (suite-tree nil) ;; list representation of the test suite tree. car is root, cdr is children.
   ;; a subelement like (2 4 5 6) represents a tree with root 2 and children (4 5 6).
-  ;; during list building there is no root (it is nil), but it is added on the rootName method.
-  (element-stack (list)) ;; stack of parent elements for the current test suite node.
+  (element-stack '()) ;; stack of parent elements for the current test suite node.
   ;; pushed to on suiteTreeStarted, popped on suiteTreeEnded.
-  (name-stack (list))
-  (current-elements (list))
-
-  )
+  (name-stack '())
+  (current-elements '()))
 
 ;; TESTING_STARTED = "testingStarted";
 ;; TESTING_FINISHED = "testingFinished";
