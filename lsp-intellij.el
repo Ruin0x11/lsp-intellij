@@ -100,7 +100,8 @@ of matched directories.  Nil otherwise."
 (defun lsp-intellij--make-jar-temp-path (jar-path internal-path)
   "Return a temporary path for the file in the jar at JAR-PATH, INTERNAL-PATH, to be extracted to."
   (let* ((jar-file-name (file-name-base jar-path))
-         (temp-path (concat temporary-file-directory "lsp-intellij/" jar-file-name "/")))
+         (internal-dir (file-name-directory internal-path))
+         (temp-path (concat temporary-file-directory "lsp-intellij/" jar-file-name internal-dir)))
     temp-path))
 
 (defun lsp-intellij--write-jar-metadata (archive-path dest)
@@ -111,10 +112,8 @@ Used for allowing IntelliJ to find the actual jar an extracted jar file is conta
     (insert (lsp--path-to-uri archive-path))
     (write-file (concat dest "jarpath") nil)))
 
-(defun lsp-intellij--extract-archive-file (source-archive original-archive internal-path dest)
-  "Extracts the file inside a jar SOURCE-ARCHIVE at INTERNAL-PATH to DEST.
-
-Also writes the location of ORIGINAL-ARCHIVE, containing the compiled classes, so IntelliJ can find it."
+(defun lsp-intellij--extract-archive-file (source-archive internal-path dest)
+  "Extracts the file inside a jar SOURCE-ARCHIVE at INTERNAL-PATH to DEST. "
   (let* ((internal-dir (substring (file-name-directory internal-path) 1))
          (internal-file (file-name-nondirectory internal-path))
          (internal-name (file-name-sans-extension internal-file))
@@ -126,9 +125,9 @@ Also writes the location of ORIGINAL-ARCHIVE, containing the compiled classes, s
         (re-search-forward search-string)
         (archive-extract)
         (let ((extract-buffer (current-buffer))
-              (outpath (concat dest internal-dir (file-name-nondirectory (buffer-file-name)))))
+              (outpath (concat dest (file-name-nondirectory (buffer-file-name)))))
           (mkdir (file-name-directory outpath) t)
-          (lsp-intellij--write-jar-metadata original-archive dest)
+          (lsp-intellij--write-jar-metadata source-archive dest)
           (write-file outpath nil)
           (kill-buffer archive-buffer)
           (kill-buffer extract-buffer)
@@ -138,14 +137,17 @@ Also writes the location of ORIGINAL-ARCHIVE, containing the compiled classes, s
   "\\\.\\(java\\|kt\\|scala\\|xml\\|MF\\)$")
 
 (defun lsp-intellij--extracted-file-exists (basename temp-path)
-  "Test if a file with name BASENAME at TEMP-PATH has been extracted from a jar.
+  "Test if a file containing BASENAME at TEMP-PATH has been extracted from a jar.
 
 Used for finding the corresponding .java/.kt file from a jar's .class file.
 Return the file path if found, nil otherwise."
-  (and (file-exists-p temp-path)
-       (cl-find-if (lambda (s) (and (eq (file-name-sans-extension s) basename)
-                                    (string-match-p lsp-intellij--file-extracted-from-jar-regex s)))
-                   (directory-files temp-path))))
+  (when-let
+      ((filename
+        (and (file-exists-p temp-path)
+             (cl-find-if (lambda (s) (and (equal (file-name-sans-extension s) basename)
+                                          (string-match-p lsp-intellij--file-extracted-from-jar-regex s)))
+                         (directory-files temp-path)))))
+    (concat temp-path filename)))
 
 (defun lsp-intellij--visit-jar-uri (uri)
   "Visit a URI with the jar:// protocol by extracting the file from the jar and visiting it."
@@ -155,20 +157,15 @@ Return the file path if found, nil otherwise."
          (paths (split-string raw "!"))
          (jar-path (concat drive-letter ":" (car paths)))
          (internal-path (cadr paths))
-         (sources-jar-path (replace-regexp-in-string "\.jar$" "-sources.jar" jar-path))
-         (jar-to-extract (if (file-exists-p sources-jar-path) sources-jar-path jar-path))
-         (temp-path (lsp-intellij--make-jar-temp-path jar-to-extract internal-path)))
+         (temp-path (lsp-intellij--make-jar-temp-path jar-path internal-path)))
 
     ;; For now, just error if no sources are found.
     ;; In the future we could request IntelliJ to give us the decompiled .class file source.
-    (if (file-exists-p sources-jar-path)
+    (if (file-exists-p jar-path)
         (if-let ((existing-file
-                  (lsp-intellij--extracted-file-exists
-                   (file-name-base internal-path)
-                   temp-path)))
+                  (lsp-intellij--extracted-file-exists (file-name-base internal-path) temp-path)))
             existing-file
-          (lsp-intellij--extract-archive-file
-           jar-to-extract jar-to-extract internal-path temp-path))
+          (lsp-intellij--extract-archive-file jar-path internal-path temp-path))
       (error "No sources found for file in JAR: %s" uri))))
 
 (defun lsp-intellij-find-implementations ()
