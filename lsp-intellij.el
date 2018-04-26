@@ -3,7 +3,7 @@
 ;; Copyright (C) 2018 Ian Pickering
 
 ;; Author: Ruin0x11 <ipickering2@gmail.com>
-;; Keywords: java kotlin
+;; Keywords: languages processes tools
 ;; Package-Requires: ((emacs "25.1") (lsp-mode "4.1"))
 ;; Version: 0.1
 ;; URL: https://github.com/Ruin0x11/lsp-intellij
@@ -37,13 +37,15 @@
 ;;; Code:
 
 (require 'lsp-mode)
-(require 'cl)
+(require 'cl-lib)
 
 (defvar lsp-intellij--config-options (make-hash-table))
 (defvar-local lsp-intellij--progress-state (make-hash-table :test 'equal))
 
 (defvar lsp-intellij-use-topmost-maven-root t
-  "If non-nil, `lsp-intellij' will attempt to locate the topmost
+  "Whether or not to use the topmost Maven project in a nested hierarchy.
+
+If non-nil, `lsp-intellij' will attempt to locate the topmost
 Maven project in a nested hierarchy if a Maven subproject is opened
 and set the LSP project root to it. Otherwise, `lsp-intellij' will set
 the project root to be the root of the Maven subproject.")
@@ -56,7 +58,7 @@ PATH may be a file or directory and directory paths may end with a slash."
 
 ;; copied from projectile to avoid a dependency
 (defun lsp-intellij--root-top-down-recurring (dir list)
-  "Identify a project root in DIR by recurring top-down search for files in LIST.
+  "Find a project root in DIR by recurring top-down search for files in LIST.
 Return the last (bottommost) matched directory in the topmost sequence
 of matched directories.  Nil otherwise."
   (cl-some
@@ -74,12 +76,12 @@ of matched directories.  Nil otherwise."
     (maphash (lambda (k v) (return v))
              hash-table)))
 
-(defun lsp-intellij--is-extracted-jar-file (file-name)
+(defun lsp-intellij--is-extracted-jar-file (filename)
   (or
    ;; extracted from archive-mode (prevents error when LSP mode hooks run)
-   (and (string-match-p "\.jar:[a-zA-Z]+" file-name) (not (file-exists-p file-name)))
+   (and (string-match-p "\.jar:[a-zA-Z]+" filename) (not (file-exists-p filename)))
    ;; extracted using lsp-intellij
-   (string-match-p (regexp-quote temporary-file-directory) file-name)))
+   (string-match-p (regexp-quote temporary-file-directory) filename)))
 
 (defun lsp-intellij--get-root ()
   (if (lsp-intellij--is-extracted-jar-file (buffer-file-name))
@@ -98,15 +100,15 @@ of matched directories.  Nil otherwise."
         (file-name-directory root)))))
 
 (defun lsp-intellij--jar-root-dir (jar-path)
-  (let* ((jar-file-name (file-name-base jar-path))
-         (root-dir (concat temporary-file-directory "lsp-intellij/" jar-file-name)))
+  (let* ((jar-filename (file-name-base jar-path))
+         (root-dir (expand-file-name (concat "lsp-intellij/" jar-filename) temporary-file-directory)))
     root-dir))
 
 (defun lsp-intellij--make-jar-temp-path (jar-path internal-path)
   "Return a temporary path for the file in the jar at JAR-PATH, INTERNAL-PATH, to be extracted to."
   (let* ((root-dir (lsp-intellij--jar-root-dir jar-path))
          (internal-dir (file-name-directory internal-path))
-         (temp-path (concat root-dir internal-dir)))
+         (temp-path (expand-file-name internal-dir root-dir)))
     temp-path))
 
 (defun lsp-intellij--write-jar-metadata (archive-path dest)
@@ -115,10 +117,10 @@ of matched directories.  Nil otherwise."
 Used for allowing IntelliJ to find the actual jar an extracted jar file is contained in."
   (with-temp-buffer
     (insert (lsp--path-to-uri archive-path))
-    (write-file (concat dest "jarpath") nil)))
+    (write-file (expand-file-name "jarpath" dest) nil)))
 
 (defun lsp-intellij--extract-archive-file (source-archive internal-path dest)
-  "Extracts the file inside a jar SOURCE-ARCHIVE at INTERNAL-PATH to DEST. "
+  "Extracts the file inside a jar SOURCE-ARCHIVE at INTERNAL-PATH to DEST."
   (let* ((internal-dir (substring (file-name-directory internal-path) 1))
          (internal-file (file-name-nondirectory internal-path))
          (internal-name (file-name-sans-extension internal-file))
@@ -131,7 +133,7 @@ Used for allowing IntelliJ to find the actual jar an extracted jar file is conta
         (re-search-forward search-string)
         (archive-extract)
         (let ((extract-buffer (current-buffer))
-              (outpath (concat dest (file-name-nondirectory (buffer-file-name)))))
+              (outpath (expand-file-name (file-name-nondirectory (buffer-file-name)) dest)))
           (mkdir (file-name-directory outpath) t)
           (lsp-intellij--write-jar-metadata source-archive jarpath-dest)
           (write-file outpath nil)
@@ -143,7 +145,7 @@ Used for allowing IntelliJ to find the actual jar an extracted jar file is conta
   "\\\.\\(java\\|kt\\|scala\\|xml\\|MF\\)$")
 
 (defun lsp-intellij--extracted-file-exists (basename temp-path)
-  "Test if a file containing BASENAME at TEMP-PATH has been extracted from a jar.
+  "Test if a file containing BASENAME at TEMP-PATH is from a jar.
 
 Used for finding the corresponding .java/.kt file from a jar's .class file.
 Return the file path if found, nil otherwise."
@@ -153,14 +155,14 @@ Return the file path if found, nil otherwise."
              (cl-find-if (lambda (s) (and (equal (file-name-sans-extension s) basename)
                                           (string-match-p lsp-intellij--file-extracted-from-jar-regex s)))
                          (directory-files temp-path)))))
-    (concat temp-path filename)))
+    (expand-file-name filename temp-path)))
 
 (defun lsp-intellij--visit-jar-uri (uri)
   "Visit a URI with the jar:// protocol by extracting the file from the jar and visiting it."
   (let* ((url (url-generic-parse-url uri))
          (drive-letter (url-host url))
          (raw (url-filename url))
-         (paths (split-string raw "!"))
+         (paths (split-string raw "!/"))
          (jar-path (concat drive-letter ":" (car paths)))
          (internal-path (cadr paths))
          (temp-path (lsp-intellij--make-jar-temp-path jar-path internal-path))
@@ -216,7 +218,7 @@ Return the file path if found, nil otherwise."
      (message "No run configurations were found.")))
 
 (defun lsp-intellij--get-run-command (config)
-  "Gets the run command for a given RunConfigurationDescription."
+  "Get the run command for a given IDEA run configuration CONFIG."
   (lsp--send-request
    (lsp--make-request
     "idea/runProject"
@@ -243,9 +245,8 @@ Return the file path if found, nil otherwise."
     (setenv "CLASSPATH" (gethash "classpath" command))
     (compile command-str)))
 
-;; TODO: make a hash listing a build per config
 (defvar lsp-intellij--run-after-build-command nil
-  "Run configuration to run after the current build finishes")
+  "The run configuration to run after the current build finishes.")
 
 (defun lsp-intellij-build-project ()
   "Start building a project using an IntelliJ run configuration."
@@ -317,7 +318,7 @@ This will run all tests if the class is a test class."
               lsp-code-lenses))
 
 (defun lsp-intellij--most-local-code-lens ()
-  "Finds the code lens with the smallest range at point."
+  "Find the code lens with the smallest size at point."
   (lsp-intellij--min-by (lambda (lens)
              (let* ((range (gethash "range" lens))
                     (start (lsp--position-to-point (gethash "start" range)))
