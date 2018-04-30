@@ -260,15 +260,18 @@ Return the file path if found, nil otherwise."
              (setq lsp-intellij--run-after-build-command command)
              (lsp-intellij--do-build-project config)))
 
-          (t (lsp-intellij--run-project-command command))))
-  )
+          (t (lsp-intellij--run-project-command command)))))
+
 (defun lsp-intellij--run-project-command (command)
   "Run a command line COMMAND from idea/runProject in a compilation buffer."
   (let ((default-directory (gethash "workingDirectory" command))
         (command-str (replace-regexp-in-string "\n" " "
                                                (gethash "command" command))))
-    (setenv "CLASSPATH" (gethash "classpath" command))
-    (compile command-str)))
+
+    (let ((process-environment
+           (cons (concat "CLASSPATH=" (gethash "classpath" command))
+                 process-environment)))
+      (compile command-str))))
 
 (defvar lsp-intellij--run-after-build-command nil
   "The run configuration to run after the current build finishes.")
@@ -302,8 +305,8 @@ Return the file path if found, nil otherwise."
 (defun lsp-intellij-run-at-point ()
   "Run the item (main class, unit test) at point."
   (interactive)
-  (unless (lsp-intellij--run-project-from-code-lens
-           (lsp-intellij--most-local-code-lens))
+  (if-let ((lens (lsp-intellij--most-local-code-lens)))
+      (lsp-intellij--run-project-from-code-lens lens)
     (user-error "No configurations at point")))
 
 (defun lsp-intellij-run-buffer-class ()
@@ -311,8 +314,8 @@ Return the file path if found, nil otherwise."
 
 This will run all tests if the class is a test class."
   (interactive)
-  (unless (lsp-intellij--run-project-from-code-lens
-           (lsp-intellij--run-buffer-lens))
+  (if-let ((lens (lsp-intellij--run-buffer-lens)))
+      (lsp-intellij--run-project-from-code-lens lens)
     (user-error "No configurations for running buffer found")))
 
 (defun lsp-intellij--run-project-from-code-lens (code-lens)
@@ -350,12 +353,13 @@ Return the code lens if found, nil otherwise."
 
 (defun lsp-intellij--most-local-code-lens ()
   "Find the code lens with the smallest size at point."
-  (lsp-intellij--min-by (lambda (lens)
-             (let* ((range (gethash "range" lens))
-                    (start (lsp--position-to-point (gethash "start" range)))
-                    (end (lsp--position-to-point (gethash "end" range))))
-               (- end start)))
-                        (lsp-intellij--code-lenses-at-point)))
+  (when-let ((lenses (lsp-intellij--code-lenses-at-point)))
+    (lsp-intellij--min-by (lambda (lens)
+                            (let* ((range (gethash "range" lens))
+                                   (start (lsp--position-to-point (gethash "start" range)))
+                                   (end (lsp--position-to-point (gethash "end" range))))
+                              (- end start)))
+                          lenses)))
 
 (defvar lsp-intellij--code-lens-overlays (make-hash-table :test 'eq))
 
