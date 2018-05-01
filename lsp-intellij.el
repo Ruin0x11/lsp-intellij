@@ -201,17 +201,6 @@ Return the file path if found, nil otherwise."
           (lsp-intellij--extract-archive-file jar-path internal-path temp-path))
       (error "No sources found for file in JAR: %s" uri))))
 
-(defun lsp-intellij-find-implementations ()
-  "List all implementations for the Java element at point."
-  (interactive)
-  (let* ((impls (lsp--send-request (lsp--make-request
-                                    "idea/implementations"
-                                    (lsp--text-document-position-params))))
-         (items (lsp--locations-to-xref-items impls)))
-    (if items
-        (xref--show-xrefs items nil)
-      (message "No implementations found for: %s" (thing-at-point 'symbol t)))))
-
 (defun lsp-intellij--project-run-configurations ()
   "Get the list of project run configurations."
   (lsp--send-request (lsp--make-request
