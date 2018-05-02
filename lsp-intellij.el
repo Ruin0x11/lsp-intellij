@@ -42,6 +42,30 @@
 (defvar lsp-intellij--config-options (make-hash-table))
 (defvar-local lsp-intellij--progress-state (make-hash-table :test 'equal))
 
+(defcustom lsp-intellij-enable-server-development nil
+  "Enables developing the LSP server plugin using the plugin itself.
+
+If non-nil, the client will try connecting to a separate development
+server if it detects that it is editing the intellij-lsp-server
+sources. Only enable this if you're developing intellij-lsp-server
+with Emacs.")
+
+(defcustom lsp-intellij-server-port 8080
+  "Port to use for connecting to the LSP server inside IntelliJ.
+
+If you change this, be sure to change the corresponding option in the
+plugin settings menu of IntelliJ.")
+
+(defcustom lsp-intellij-server-port 8081
+  "Port to use for the development LSP server.
+
+This will only take effect if `lsp-intellij-enable-server-development'
+is non-nil and the intellij-lsp-server sources are being edited.
+
+If you change this, be sure to change the corresponding option in the
+plugin settings menu of the copy of IntelliJ being used to develop the
+server plugin.")
+
 (defcustom lsp-intellij-use-topmost-root t
   "Whether or not to use the topmost IntelliJ project in a nested hierarchy.
 
@@ -84,7 +108,7 @@ of matched directories.  Nil otherwise."
   "Test if the file FILENAME was extracted from a .jar.
 
 This is when the buffer name indicates the file is a temporary buffer created by
-`archive-mode' or the FILENAME exists in `temporary-file-directory'."
+`archive-mode' or FILENAME exists in `temporary-file-directory'."
   (or
    ;; extracted from archive-mode (prevents error when LSP mode hooks run)
    (and (string-match-p "\.jar:[a-zA-Z]+" filename) (not (file-exists-p filename)))
