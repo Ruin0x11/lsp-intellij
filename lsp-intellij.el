@@ -258,9 +258,21 @@ Return the file path if found, nil otherwise."
                                                (gethash "command" command))))
 
     (let ((process-environment
-           (cons (concat "CLASSPATH=" (gethash "classpath" command))
-                 process-environment)))
+           (lsp-intellij--prepare-process-environment command)))
       (compile command-str))))
+
+(defun lsp-intellij--prepare-process-environment (command)
+  "Create a process environment with classpath for running COMMAND."
+  (let* ((vars (gethash "environment" command))
+        (prepared-vars (mapcar (lambda (v)
+                                 (format "%s=%s"
+                                         (gethash "name" v)
+                                         (gethash "value" v)))
+                               vars))
+        (env-with-classpath
+         (cons (concat "CLASSPATH=" (gethash "classpath" command))
+               process-environment)))
+    (append prepared-vars env-with-classpath)))
 
 (defvar lsp-intellij--run-after-build-command nil
   "The run configuration to run after the current build finishes.")
