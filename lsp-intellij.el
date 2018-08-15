@@ -39,6 +39,7 @@
 (require 'lsp-mode)
 (require 'cl-lib)
 
+(defvar lsp-intellij-server-port 8080)
 (defvar lsp-intellij--config-options (make-hash-table))
 (defvar-local lsp-intellij--progress-state (make-hash-table :test 'equal))
 
@@ -565,7 +566,7 @@ status. If VALUE is nil, remove the status from the display."
   (lsp-client-register-uri-handler client "jar" 'lsp-intellij--visit-jar-uri))
 
 (lsp-define-tcp-client lsp-intellij "intellij" #'lsp-intellij--get-root lsp-intellij-dummy-executable
-                       "127.0.0.1" 8080
+                       "127.0.0.1" 'lsp-intellij-server-port
                        :initialize #'lsp-intellij--initialize-client)
 
 (defun lsp-intellij--set-configuration ()
